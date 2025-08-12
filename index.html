@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Eventify — Event Management & Registration</title>
+<style>
+  :root{
+    --bg:#f5f7fb; --card:#ffffff; --muted:#6b7280; --accent:#0066ff; --success:#059669;
+    --glass: rgba(255,255,255,0.6);
+  }
+  body.dark{ --bg:#0b1020; --card:#0f1724; --muted:#9ca3af; --accent:#3b82f6; --success:#10b981; --glass: rgba(255,255,255,0.03); }
+  *{box-sizing:border-box}
+  body{font-family:Inter,system-ui,Segoe UI,Arial; margin:0; background:linear-gradient(180deg,var(--bg),#e9eef8); color:var(--muted); min-height:100vh; transition:all .25s}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:transparent;backdrop-filter: blur(6px)}
+  .brand{display:flex;gap:12px;align-items:center}
+  .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);box-shadow:0 6px 18px rgba(0,0,0,0.12);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
+  h1{font-size:18px;color:var(--muted);margin:0}
+  .controls{display:flex;gap:8px;align-items:center}
+  button.btn{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:white;cursor:pointer}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid rgba(0,0,0,0.06)}
+  .container{max-width:1100px;margin:20px auto;padding:0 18px;display:grid;grid-template-columns:1fr 340px;gap:18px}
+  /* main */
+  .panel{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 30px rgba(16,24,40,0.06)}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+  .search{flex:1;display:flex;gap:8px}
+  input[type="search"]{flex:1;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,0.06);outline:none}
+  select, .chip{padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,0.06);background:var(--glass);cursor:pointer}
+  .chip{display:inline-flex;align-items:center;gap:8px}
+  .events{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+  .card{background:linear-gradient(180deg,var(--card),rgba(0,0,0,0.01));padding:12px;border-radius:12px;border:1px solid rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:8px;min-height:160px}
+  .card h3{margin:0;color:#0f1724;font-size:16px}
+  .meta{font-size:13px;color:var(--muted);display:flex;justify-content:space-between;margin-top:auto}
+  .tags{display:flex;gap:6px;flex-wrap:wrap}
+  .tag{font-size:12px;padding:6px 8px;border-radius:999px;background:rgba(0,0,0,0.03);color:var(--muted)}
+  .register{margin-top:8px;padding:8px;border-radius:10px;border:0;background:var(--accent);color:white;cursor:pointer}
+  .register[disabled]{opacity:.6;cursor:not-allowed}
+  /* sidebar */
+  .sidebar{display:flex;flex-direction:column;gap:12px;position:sticky;top:20px;height:calc(100vh - 60px);overflow:auto;padding-bottom:20px}
+  .dash-list{display:flex;flex-direction:column;gap:8px}
+  .dash-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;background:linear-gradient(180deg,transparent, rgba(0,0,0,0.02));border:1px solid rgba(0,0,0,0.03)}
+  .empty{padding:18px;border-radius:8px;text-align:center;color:var(--muted)}
+  footer{max-width:1100px;margin:14px auto;color:var(--muted);font-size:13px;padding:0 18px}
+  /* responsive */
+  @media (max-width:980px){.container{grid-template-columns:1fr}.sidebar{position:static;height:auto}}
+  /* small animations */
+  .card, .panel{transition:transform .18s, box-shadow .18s}
+  .card:hover{transform:translateY(-6px);box-shadow:0 14px 40px rgba(2,6,23,0.08)}
+  .badge{font-size:12px;padding:6px 8px;border-radius:999px;background:var(--accent);color:white}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">E</div>
+    <div>
+      <h1>Eventify</h1>
+      <div style="font-size:13px;color:var(--muted)">Find events • Register • Track</div>
+    </div>
+  </div>
+  <div class="controls">
+    <button id="themeToggle" class="ghost">🌙 Dark</button>
+    <button id="clearBtn" class="btn">Clear All Registrations</button>
+  </div>
+</header>
+
+<main class="container">
+  <section>
+    <div class="panel">
+      <div class="toolbar">
+        <div class="search">
+          <input id="searchInput" type="search" placeholder="Search events by title or location..." />
+          <select id="sortSelect" title="Sort">
+            <option value="upcoming">Sort: Upcoming</option>
+            <option value="popular">Sort: Popular</option>
+            <option value="free">Filter: Free</option>
+          </select>
+        </div>
+        <div class="chip" id="categoryAll" data-cat="all">All</div>
+        <div class="chip" data-cat="Tech">Tech</div>
+        <div class="chip" data-cat="Music">Music</div>
+        <div class="chip" data-cat="Sports">Sports</div>
+        <div class="chip" data-cat="Art">Art</div>
+      </div>
+
+      <div id="eventsGrid" class="events" aria-live="polite"></div>
+      <div id="noResults" class="empty" style="display:none">No events match your search.</div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="sidebar">
+      <div class="panel">
+        <h3 style="margin:0 0 8px 0;color:#0f1724">My Registrations</h3>
+        <div id="registrations" class="dash-list">
+          <div class="empty">No registrations yet — register for an event to see it here.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h4 style="margin:0 0 8px 0;color:#0f1724">Upcoming Counts</h4>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="card" style="padding:10px;min-width:120px">
+            <div style="font-size:12px;color:var(--muted)">Total Events</div>
+            <div style="font-weight:700;font-size:20px" id="totalCount">0</div>
+          </div>
+          <div class="card" style="padding:10px;min-width:120px">
+            <div style="font-size:12px;color:var(--muted)">Registered</div>
+            <div style="font-weight:700;font-size:20px" id="registeredCount">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h4 style="margin:0 0 8px 0;color:#0f1724">Quick Add (Demo)</h4>
+        <form id="quickAdd">
+          <input id="qaTitle" placeholder="Title" required style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);" />
+          <input id="qaLoc" placeholder="Location" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);margin-top:8px" />
+          <select id="qaCat" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);margin-top:8px">
+            <option>Tech</option><option>Music</option><option>Sports</option><option>Art</option>
+          </select>
+          <button type="submit" class="btn" style="width:100%;margin-top:8px">Add Event</button>
+        </form>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<footer>Made with ♥ — Eventify. Data is stored in your browser's localStorage.</footer>
+
+<script>
+/* -------------------------
+   Data & Storage Helpers
+   -------------------------*/
+const EVENTS_KEY = "eventify-events-v1";
+const REG_KEY = "eventify-registrations-v1";
+
+/* Sample events */
+let events = [
+  { id: 1, title: "Frontend Masters Workshop", category:"Tech", date:"2025-09-10", time:"10:00", location:"Bengaluru", price: 0, seats: 120, popularity: 250 },
+  { id: 2, title: "Indie Acoustic Night", category:"Music", date:"2025-08-30", time:"19:30", location:"Hyderabad", price: 15, seats: 80, popularity: 140 },
+  { id: 3, title: "City Marathon 10K", category:"Sports", date:"2025-10-05", time:"06:00", location:"Mumbai", price: 5, seats: 500, popularity: 400 },
+  { id: 4, title: "Modern Art Exhibition", category:"Art", date:"2025-09-20", time:"11:00", location:"Chennai", price: 0, seats: 60, popularity: 90 },
+  { id: 5, title: "AI & ML Conference", category:"Tech", date:"2025-11-12", time:"09:00", location:"Delhi", price: 50, seats: 300, popularity: 680 }
+];
+
+/* load persisted events if present (quick add uses this) */
+const saved = localStorage.getItem(EVENTS_KEY);
+if(saved){ try{ events = JSON.parse(saved) }catch(e){ console.warn("events parse error",e) } }
+
+/* registrations: store array of event ids */
+let registrations = JSON.parse(localStorage.getItem(REG_KEY) || "[]");
+
+/* -------------------------
+   UI elements
+   -------------------------*/
+const eventsGrid = document.getElementById("eventsGrid");
+const registrationsEl = document.getElementById("registrations");
+const totalCountEl = document.getElementById("totalCount");
+const registeredCountEl = document.getElementById("registeredCount");
+const searchInput = document.getElementById("searchInput");
+const sortSelect = document.getElementById("sortSelect");
+const categoryChips = document.querySelectorAll(".chip");
+const noResults = document.getElementById("noResults");
+const themeToggle = document.getElementById("themeToggle");
+const clearBtn = document.getElementById("clearBtn");
+
+/* -------------------------
+   Render Helpers
+   -------------------------*/
+function formatDate(d){
+  const dt = new Date(d);
+  return dt.toLocaleDateString(undefined, {month:"short", day:"numeric"});
+}
+
+function isRegistered(eid){ return registrations.includes(eid) }
+
+function saveState(){
+  localStorage.setItem(REG_KEY, JSON.stringify(registrations));
+  localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+}
+
+function renderCounts(){
+  totalCountEl.textContent = events.length;
+  registeredCountEl.textContent = registrations.length;
+}
+
+/* render event cards based on filters */
+function renderEvents(){
+  const q = searchInput.value.trim().toLowerCase();
+  const sortVal = sortSelect.value;
+  const activeCat = document.querySelector(".chip.active")?.dataset.cat || "all";
+
+  let filtered = events.filter(ev=>{
+    if(activeCat !== "all" && ev.category !== activeCat) return false;
+    if(q && !(ev.title.toLowerCase().includes(q) || ev.location.toLowerCase().includes(q))) return false;
+    if(sortVal === "free" && ev.price !== 0) return false;
+    return true;
+  });
+
+  if(sortVal === "upcoming"){
+    filtered.sort((a,b)=>new Date(a.date) - new Date(b.date));
+  } else if(sortVal === "popular"){
+    filtered.sort((a,b)=>b.popularity - a.popularity);
+  }
+
+  eventsGrid.innerHTML = "";
+  if(filtered.length === 0){
+    noResults.style.display = "block";
+  } else {
+    noResults.style.display = "none";
+    filtered.forEach(ev=>{
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
+          <div>
+            <h3>${ev.title}</h3>
+            <div style="font-size:13px;color:var(--muted)">${ev.location} • ${formatDate(ev.date)} • ${ev.time}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="badge">${ev.category}</div>
+            <div style="margin-top:8px;font-weight:700">${ev.price === 0 ? "Free" : "₹"+ev.price}</div>
+          </div>
+        </div>
+        <div class="tags" style="margin-top:8px">
+          <div class="tag">Seats: ${ev.seats}</div>
+          <div class="tag">Attendees: ${ev.popularity}</div>
+        </div>
+        <div class="meta">
+          <div style="font-size:13px;color:var(--muted)">${new Date(ev.date) > new Date() ? "Upcoming" : "Past"}</div>
+          <div>
+            <button class="register" data-id="${ev.id}" ${isRegistered(ev.id) ? 'disabled' : ''}>${isRegistered(ev.id) ? 'Registered' : 'Register'}</button>
+          </div>
+        </div>
+      `;
+      eventsGrid.appendChild(card);
+    });
+  }
+  attachRegisterButtons();
+  renderCounts();
+}
+
+/* render registrations in sidebar */
+function renderRegistrations(){
+  registrationsEl.innerHTML = "";
+  if(registrations.length === 0){
+    registrationsEl.innerHTML = '<div class="empty">No registrations yet — register for an event to see it here.</div>';
+    return;
+  }
+  registrations.slice().reverse().forEach(id=>{
+    const ev = events.find(e=>e.id === id);
+    if(!ev) return;
+    const row = document.createElement("div");
+    row.className = "dash-item";
+    row.innerHTML = `
+      <div>
+        <div style="font-weight:700;color:#0f1724">${ev.title}</div>
+        <div style="font-size:13px;color:var(--muted)">${formatDate(ev.date)} • ${ev.location}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+        <button class="ghost" data-unreg="${ev.id}" style="padding:6px 8px;border-radius:8px">Cancel</button>
+        <div style="font-weight:700;color:var(--success);font-size:13px">${ev.price===0? 'Free':'₹'+ev.price}</div>
+      </div>
+    `;
+    registrationsEl.appendChild(row);
+  });
+  // attach cancel handlers
+  document.querySelectorAll('[data-unreg]').forEach(btn=>{
+    btn.addEventListener('click', ()=> {
+      const id = Number(btn.dataset.unreg);
+      registrations = registrations.filter(x=>x !== id);
+      saveState(); renderRegistrations(); renderEvents();
+    });
+  });
+}
+
+/* -------------------------
+   Interaction Handlers
+   -------------------------*/
+function attachRegisterButtons(){
+  document.querySelectorAll('.register').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = Number(btn.dataset.id);
+      if(!registrations.includes(id)){
+        registrations.push(id);
+        saveState();
+        renderRegistrations();
+        renderEvents();
+      }
+    });
+  });
+}
+
+/* category chips */
+categoryChips.forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    renderEvents();
+  });
+});
+document.getElementById('categoryAll').classList.add('active');
+
+/* search & sort */
+searchInput.addEventListener('input', ()=> renderEvents());
+sortSelect.addEventListener('change', ()=> renderEvents());
+
+/* theme */
+function loadTheme(){
+  const t = localStorage.getItem('eventify-theme') || 'light';
+  if(t === 'dark') document.body.classList.add('dark'), themeToggle.textContent = '☀ Light';
+  else document.body.classList.remove('dark'), themeToggle.textContent = '🌙 Dark';
+}
+themeToggle.addEventListener('click', ()=>{
+  document.body.classList.toggle('dark');
+  localStorage.setItem('eventify-theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+  loadTheme();
+});
+
+/* clear registrations */
+clearBtn.addEventListener('click', ()=>{
+  if(!confirm("Clear all registrations?")) return;
+  registrations = []; saveState(); renderRegistrations(); renderEvents();
+});
+
+/* quick add demo form */
+document.getElementById('quickAdd').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const t = document.getElementById('qaTitle').value.trim();
+  const loc = document.getElementById('qaLoc').value.trim() || "Online";
+  const cat = document.getElementById('qaCat').value;
+  if(!t) return alert("Please enter a title");
+  const newEv = {
+    id: Date.now(),
+    title: t,
+    category: cat,
+    date: new Date(Date.now() + 1000*60*60*24*14).toISOString().slice(0,10), // two weeks from now
+    time: "18:00",
+    location: loc,
+    price: 0,
+    seats: 100,
+    popularity: Math.floor(Math.random()*80)+20
+  };
+  events.push(newEv);
+  saveState();
+  document.getElementById('qaTitle').value=''; document.getElementById('qaLoc').value='';
+  renderEvents();
+  alert("Event added to list (demo).");
+});
+
+/* cancel registration on clicking a registration item inside sidebar handled in renderRegistrations */
+
+/* initial render */
+loadTheme();
+renderEvents();
+renderRegistrations();
+renderCounts();
+</script>
+</body>
+</html>
